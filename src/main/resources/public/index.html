@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>web-console-demo</title>
+		<style>
+			body{
+				margin:0;
+				width:100vw;
+				height:100vh;
+				overflow:hidden;
+			}
+			.message-box{
+				position:absolute;
+				top:30px;
+				background:black;
+				left:0;
+				right:0;
+				bottom:0;
+				overflow:scroll;
+
+			}
+			.message-box>pre{
+				margin:0;
+				color:#fff;
+				z-index:-1;
+			}
+			.action-bar{
+				height:30px;
+				display:flex;
+				flex-flow:row nowrap;
+				align-items:center;
+			}
+			.action-bar>input{
+				flex:auto;
+				height:30px;
+			}
+		</style>
+	</head>
+	<body>
+		<section class="action-bar">
+			<select id="logLevelFilterSelect" >
+				<option value="">ALL</option>
+				<option>DEBUG</option>
+				<option>ERROR</option>
+				<option>WARN</option>
+				<option>INFO</option>
+				<option>FATAL</option>
+				<option>TRACE</option>
+			</select>
+			<input id="logMessageKeyFilterInput">
+		</section>
+		<article id="messageBox" class="message-box"></article>
+		<script src="js/sockjs.min.js"></script>
+		<script>
+			const MAX_MESSAGE_COUNT=100;
+
+			const initSockJS=function(){
+				 var sock = new SockJS('/webconsole');
+				 sock.onopen = function() {
+					 console.log("connection to ",this);
+				 };
+				 sock.onmessage = function(e) {
+				 	 while(messageBox.childNodes.lenght>MAX_MESSAGE_COUNT){
+				 	 	messageBox.removeChild(messageBox.firstChild);
+				 	 }
+				 	 const message=new LogMessage(e.data);
+					 messageBox.appendChild(message.el);
+					 //滚动到底部
+					 messageBox.scrollTop=messageBox.scrollHeight;
+				 };
+			};
+			window.addEventListener("load",function(){
+				initSockJS();
+				logLevelFilterSelect.addEventListener("change",handleLogLevelFilterSelectChange);
+				logMessageKeyFilterInput.addEventListener("keyup",handleLogMessageKeyFilterInputChange);
+			});
+			const handleLogLevelFilterSelectChange=function(evt){
+				const childNodes=messageBox.childNodes;
+				for(let i=childNodes.length;i-->0;){
+					childNodes[i].handleFilterKeyChange();
+				}
+			};
+
+			const handleLogMessageKeyFilterInputChange=function(evt){
+				let childNodes=messageBox.childNodes;
+				for(let i=childNodes.length;i-->0;){
+					childNodes[i].handleFilterKeyChange();
+				}
+			}
+
+
+
+			const LogMessage=(function(document){
+				const LogMessage=function(rawMessage){
+					this.rawMessage=rawMessage;
+					this.rawMessageUpperCase=rawMessage.toUpperCase();
+					this.el=null;
+					this.logLevel=null;
+					private.init.apply(this,arguments);
+				};
+				const private={
+					init:function(){
+						this.el=private.createElement.call(this);
+						this.logLevel=LogMessage.grabLogLevel(this.rawMessage);
+						this.el.handleFilterKeyChange=this.handleFilterKeyChange.bind(this);
+						this.handleFilterKeyChange();
+					},
+					createElement:function(){
+						const el=document.createElement("pre");
+						el.model=this;
+						el.textContent=this.rawMessage;
+						return el;
+					}
+				}
+				LogMessage.prototype={
+					handleFilterKeyChange:function(){
+					 let logLevelKey=logLevelFilterSelect.value;
+					 const el=this.el;
+					 if(logLevelKey===""||logLevelKey===this.logLevel){
+					 	el.style.position="static";
+					 	let key=logMessageKeyFilterInput.value.toUpperCase();
+					 	if(key!==""&&this.rawMessageUpperCase.indexOf(key)===-1){
+					 		el.style.position="absolute";
+					 	}
+					 }else{
+					 	el.style.position="absolute";
+					 }
+					}
+				}
+				const logPattern=new RegExp("\\s+(DEBUG|ERROR|INFO|WARN|FATAL|TRACE)\\s+","");
+				LogMessage.grabLogLevel=function(rawMessage){
+					let result=logPattern.exec(rawMessage);
+					if(result){
+						return result[1];
+					}
+					return null;
+				}
+				return LogMessage;
+			})(document);
+		</script>
+	</body>
+</html>
